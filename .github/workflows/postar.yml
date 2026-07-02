@@ -26,4 +26,5 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ML_COOKIE_HEADER: ${{ secrets.ML_COOKIE_HEADER }}
           ML_AFFILIATE_TAG: ${{ secrets.ML_AFFILIATE_TAG }}
+          MIN_DESCONTO_PERCENTUAL: "5" # TEMPORÁRIO: só pra testar, volte pra 30 depois
         run: python main.py
