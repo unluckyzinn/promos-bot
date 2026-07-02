@@ -24,4 +24,6 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ML_COOKIE_HEADER: ${{ secrets.ML_COOKIE_HEADER }}
+          ML_AFFILIATE_TAG: ${{ secrets.ML_AFFILIATE_TAG }}
         run: python main.py
