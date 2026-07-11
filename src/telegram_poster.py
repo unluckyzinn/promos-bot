@@ -54,11 +54,10 @@ class TelegramPoster:
         return texto
 
     def _montar_texto(self, promocao: dict) -> str:
-        preco_link = (
-            f'<a href="{promocao["link_afiliado"]}">'
-            f'R$ {self._formatar_preco(promocao["preco_atual"])}</a>'
-        )
-        linhas = [f"🔥 <b>{promocao['titulo']}</b> - {preco_link}"]
+        linhas = [
+            f"🔥 <b>{promocao['titulo']}</b> - R$ "
+            f"{self._formatar_preco(promocao['preco_atual'])}"
+        ]
 
         if promocao.get("preco_original") and promocao.get("desconto_percentual"):
             linhas.append("")
@@ -66,6 +65,9 @@ class TelegramPoster:
                 f"~R$ {self._formatar_preco(promocao['preco_original'])}~ "
                 f"({promocao['desconto_percentual']:.0f}% OFF)"
             )
+
+        linhas.append("")
+        linhas.append(f'🛒 <a href="{promocao["link_afiliado"]}">Comprar agora</a>')
 
         cupom = promocao.get("cupom")
         if cupom:
