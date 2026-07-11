@@ -1,9 +1,9 @@
 """
 Módulo de postagem no Telegram.
 
-Responsabilidade única: receber uma promoção já formatada e mandar pro canal.
-Não sabe nada sobre Shopee, Amazon ou Mercado Livre — isso é de propósito,
-pra você poder plugar qualquer fonte de promoção sem mexer aqui.
+Responsabilidade única: receber uma promoção (ou cupom) já formatada e
+mandar pro canal. Não sabe nada sobre Shopee, Amazon ou Mercado Livre —
+isso é de propósito, pra você poder plugar qualquer fonte sem mexer aqui.
 """
 
 import requests
@@ -23,6 +23,7 @@ class TelegramPoster:
             desconto_percentual (float | None)
             link_afiliado (str)
             imagem_url (str | None)
+            cupom (dict | None) — opcional, ver CupomScraper pro formato
 
         Retorna True se conseguiu postar, False se deu erro.
         """
@@ -32,11 +33,18 @@ class TelegramPoster:
             return self._postar_com_imagem(texto, promocao["imagem_url"])
         return self._postar_somente_texto(texto)
 
+    def postar_cupom_sozinho(self, cupom: dict, url_cupons: str) -> bool:
+        """
+        Posta um cupom sem produto casado. Espera o dict retornado pelo
+        CupomScraper (titulo_completo, compra_minima, limite, vencimento).
+        """
+        texto = self._montar_texto_cupom(cupom, url_cupons)
+        return self._postar_somente_texto(texto)
+
     def _formatar_preco(self, valor: float) -> str:
         """Formata no padrão brasileiro: vírgula decimal, ponto de milhar.
         Ex: 1234.5 -> '1.234,50'"""
         texto = f"{valor:,.2f}"  # formato US: '1,234.50'
-        # Troca separadores: vírgula (milhar) <-> ponto (decimal)
         texto = texto.replace(",", "X").replace(".", ",").replace("X", ".")
         return texto
 
@@ -55,7 +63,32 @@ class TelegramPoster:
         linhas.append("")
         linhas.append(f'🛒 <a href="{promocao["link_afiliado"]}">Comprar agora</a>')
 
+        cupom = promocao.get("cupom")
+        if cupom:
+            linhas.append("")
+            linhas.extend(self._linhas_do_cupom(cupom))
+
         return "\n".join(linhas)
+
+    def _montar_texto_cupom(self, cupom: dict, url_cupons: str) -> str:
+        linhas = ["🎟️ <b>Cupom disponível no Mercado Livre</b>", ""]
+        linhas.extend(self._linhas_do_cupom(cupom))
+        linhas.append("")
+        linhas.append(f'👉 <a href="{url_cupons}">Aplicar cupom</a>')
+        return "\n".join(linhas)
+
+    def _linhas_do_cupom(self, cupom: dict) -> list:
+        linhas = [f"🎟️ <b>{cupom['titulo_completo']}</b>"]
+
+        detalhes = []
+        if cupom.get("compra_minima"):
+            detalhes.append(f"compra mínima R$ {self._formatar_preco(cupom['compra_minima'])}")
+        if cupom.get("vencimento"):
+            detalhes.append(cupom["vencimento"])
+        if detalhes:
+            linhas.append(" · ".join(detalhes))
+
+        return linhas
 
     def _postar_somente_texto(self, texto: str) -> bool:
         resp = requests.post(
