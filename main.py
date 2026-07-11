@@ -28,7 +28,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 from ml_scraper import MercadoLivreScraper
 from ml_affiliate import MercadoLivreAffiliateLinkGenerator
 from ofertas_repositorio import OfertasRepositorio
-from cupom_scraper import CupomScraper, URL_CUPONS
+from cupom_scraper import CupomScraper
 from cupons_repositorio import CuponsRepositorio
 from telegram_poster import TelegramPoster
 
@@ -146,7 +146,7 @@ def main():
         if cupons_repositorio.ja_foi_postado(cupom["chave"]):
             continue
 
-        sucesso = telegram.postar_cupom_sozinho(cupom, URL_CUPONS)
+        sucesso = telegram.postar_cupom_sozinho(cupom)
         if sucesso:
             cupons_sozinhos_postados += 1
             cupons_repositorio.marcar_como_postado(cupom["chave"], cupom["titulo_completo"])

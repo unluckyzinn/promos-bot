@@ -4,6 +4,11 @@ Módulo de postagem no Telegram.
 Responsabilidade única: receber uma promoção (ou cupom) já formatada e
 mandar pro canal. Não sabe nada sobre Shopee, Amazon ou Mercado Livre —
 isso é de propósito, pra você poder plugar qualquer fonte sem mexer aqui.
+
+Layout inspirado em grupos de promoção populares (ex: Magalu): título +
+preço na mesma linha, com o PREÇO servindo de link (em vez de uma linha
+separada "Comprar agora"), e cupom mostrado com emoji de ticket + link
+próprio de aplicação.
 """
 
 import requests
@@ -33,12 +38,12 @@ class TelegramPoster:
             return self._postar_com_imagem(texto, promocao["imagem_url"])
         return self._postar_somente_texto(texto)
 
-    def postar_cupom_sozinho(self, cupom: dict, url_cupons: str) -> bool:
+    def postar_cupom_sozinho(self, cupom: dict) -> bool:
         """
         Posta um cupom sem produto casado. Espera o dict retornado pelo
-        CupomScraper (titulo_completo, compra_minima, limite, vencimento).
+        CupomScraper (titulo_completo, compra_minima, limite, vencimento, url).
         """
-        texto = self._montar_texto_cupom(cupom, url_cupons)
+        texto = self._montar_texto_cupom(cupom)
         return self._postar_somente_texto(texto)
 
     def _formatar_preco(self, valor: float) -> str:
@@ -49,36 +54,35 @@ class TelegramPoster:
         return texto
 
     def _montar_texto(self, promocao: dict) -> str:
-        linhas = [f"🔥 <b>{promocao['titulo']}</b>", ""]
+        preco_link = (
+            f'<a href="{promocao["link_afiliado"]}">'
+            f'R$ {self._formatar_preco(promocao["preco_atual"])}</a>'
+        )
+        linhas = [f"🔥 <b>{promocao['titulo']}</b> - {preco_link}"]
 
         if promocao.get("preco_original") and promocao.get("desconto_percentual"):
+            linhas.append("")
             linhas.append(
-                f"~R$ {self._formatar_preco(promocao['preco_original'])}~ → "
-                f"<b>R$ {self._formatar_preco(promocao['preco_atual'])}</b> "
+                f"~R$ {self._formatar_preco(promocao['preco_original'])}~ "
                 f"({promocao['desconto_percentual']:.0f}% OFF)"
             )
-        else:
-            linhas.append(f"<b>R$ {self._formatar_preco(promocao['preco_atual'])}</b>")
-
-        linhas.append("")
-        linhas.append(f'🛒 <a href="{promocao["link_afiliado"]}">Comprar agora</a>')
 
         cupom = promocao.get("cupom")
         if cupom:
             linhas.append("")
             linhas.extend(self._linhas_do_cupom(cupom))
+            linhas.append(f'👉 <a href="{cupom["url"]}">Aplicar cupom</a>')
 
         return "\n".join(linhas)
 
-    def _montar_texto_cupom(self, cupom: dict, url_cupons: str) -> str:
-        linhas = ["🎟️ <b>Cupom disponível no Mercado Livre</b>", ""]
+    def _montar_texto_cupom(self, cupom: dict) -> str:
+        linhas = ["🎫 <b>Cupom disponível no Mercado Livre</b>", ""]
         linhas.extend(self._linhas_do_cupom(cupom))
-        linhas.append("")
-        linhas.append(f'👉 <a href="{url_cupons}">Aplicar cupom</a>')
+        linhas.append(f'👉 <a href="{cupom["url"]}">Aplicar cupom</a>')
         return "\n".join(linhas)
 
     def _linhas_do_cupom(self, cupom: dict) -> list:
-        linhas = [f"🎟️ <b>{cupom['titulo_completo']}</b>"]
+        linhas = [f"🎫 <b>CUPOM: {cupom['titulo_completo']}</b>"]
 
         detalhes = []
         if cupom.get("compra_minima"):
@@ -88,6 +92,7 @@ class TelegramPoster:
         if detalhes:
             linhas.append(" · ".join(detalhes))
 
+        linhas.append("")
         return linhas
 
     def _postar_somente_texto(self, texto: str) -> bool:

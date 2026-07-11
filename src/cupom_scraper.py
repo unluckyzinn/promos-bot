@@ -103,6 +103,7 @@ class CupomScraper:
                 "compra_minima": compra_minima,
                 "limite": limite,
                 "vencimento": vencimento,
+                "url": self.url_cupons,
             }
         except Exception as e:
             print(f"[CupomScraper] Erro ao processar cupom: {e}")
