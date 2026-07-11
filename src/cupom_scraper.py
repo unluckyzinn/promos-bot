@@ -35,11 +35,22 @@ HEADERS = {
 
 
 class CupomScraper:
-    def __init__(self, url_cupons: str = URL_CUPONS):
+    def __init__(self, url_cupons: str = URL_CUPONS, cookie_header: str | None = None):
+        """
+        cookie_header: a página de cupons é pessoal (nota o "mperfil" na
+        URL — "meu perfil"), então precisa de uma sessão logada pra
+        retornar os cupons de verdade. Reaproveite o mesmo ML_COOKIE_HEADER
+        usado pro gerador de link de afiliado.
+        """
         self.url_cupons = url_cupons
+        self.cookie_header = cookie_header
 
     def buscar_cupons(self) -> list[dict]:
-        resp = requests.get(self.url_cupons, headers=HEADERS, timeout=15)
+        headers = dict(HEADERS)
+        if self.cookie_header:
+            headers["Cookie"] = self.cookie_header
+
+        resp = requests.get(self.url_cupons, headers=headers, timeout=15)
 
         if resp.status_code != 200:
             print(f"[CupomScraper] Erro HTTP: {resp.status_code}")

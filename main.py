@@ -67,12 +67,13 @@ def main():
     mercado_livre = MercadoLivreScraper()
     repositorio = OfertasRepositorio(database_url=os.environ["DATABASE_URL"])
 
-    cupom_scraper = CupomScraper()
+    cookie_header = os.environ.get("ML_COOKIE_HEADER")
+    tag_afiliado = os.environ.get("ML_AFFILIATE_TAG")
+
+    cupom_scraper = CupomScraper(cookie_header=cookie_header)
     cupons_repositorio = CuponsRepositorio(database_url=os.environ["DATABASE_URL"])
 
     afiliado = None
-    cookie_header = os.environ.get("ML_COOKIE_HEADER")
-    tag_afiliado = os.environ.get("ML_AFFILIATE_TAG")
     if cookie_header and tag_afiliado:
         afiliado = MercadoLivreAffiliateLinkGenerator(
             cookie_header=cookie_header, tag=tag_afiliado
