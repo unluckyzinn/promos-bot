@@ -63,7 +63,7 @@ def main():
     # Busca um lote grande (bem maior que a cota de postagem), pra ter de
     # onde escolher mesmo descartando duplicatas e ofertas com desconto
     # baixo demais.
-    ofertas = mercado_livre.buscar_ofertas(limite=40)
+    ofertas = mercado_livre.buscar_ofertas(limite=60)
 
     if not ofertas:
         print("Nenhuma oferta encontrada nesta rodada.")

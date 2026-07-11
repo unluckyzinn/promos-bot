@@ -32,17 +32,25 @@ class TelegramPoster:
             return self._postar_com_imagem(texto, promocao["imagem_url"])
         return self._postar_somente_texto(texto)
 
+    def _formatar_preco(self, valor: float) -> str:
+        """Formata no padrão brasileiro: vírgula decimal, ponto de milhar.
+        Ex: 1234.5 -> '1.234,50'"""
+        texto = f"{valor:,.2f}"  # formato US: '1,234.50'
+        # Troca separadores: vírgula (milhar) <-> ponto (decimal)
+        texto = texto.replace(",", "X").replace(".", ",").replace("X", ".")
+        return texto
+
     def _montar_texto(self, promocao: dict) -> str:
         linhas = [f"🔥 <b>{promocao['titulo']}</b>", ""]
 
         if promocao.get("preco_original") and promocao.get("desconto_percentual"):
             linhas.append(
-                f"~R$ {promocao['preco_original']:.2f}~ → "
-                f"<b>R$ {promocao['preco_atual']:.2f}</b> "
+                f"~R$ {self._formatar_preco(promocao['preco_original'])}~ → "
+                f"<b>R$ {self._formatar_preco(promocao['preco_atual'])}</b> "
                 f"({promocao['desconto_percentual']:.0f}% OFF)"
             )
         else:
-            linhas.append(f"<b>R$ {promocao['preco_atual']:.2f}</b>")
+            linhas.append(f"<b>R$ {self._formatar_preco(promocao['preco_atual'])}</b>")
 
         linhas.append("")
         linhas.append(f'🛒 <a href="{promocao["link_afiliado"]}">Comprar agora</a>')
