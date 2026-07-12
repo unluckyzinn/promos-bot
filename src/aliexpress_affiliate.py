@@ -32,7 +32,7 @@ HEADERS_BASE = {
 
 class AliExpressAffiliateLinkGenerator:
     def __init__(self, cookie_header: str, tracking_id: str = "default"):
-        self.cookie_header = cookie_header
+        self.cookie_header = cookie_header.strip() if cookie_header else cookie_header
         self.tracking_id = tracking_id
 
     def gerar_link(self, item_id: str) -> str | None:

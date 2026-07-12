@@ -43,7 +43,7 @@ class CupomScraper:
         usado pro gerador de link de afiliado.
         """
         self.url_cupons = url_cupons
-        self.cookie_header = cookie_header
+        self.cookie_header = cookie_header.strip() if cookie_header else cookie_header
 
     def buscar_cupons(self) -> list[dict]:
         headers = dict(HEADERS)

@@ -45,9 +45,9 @@ class MercadoLivreAffiliateLinkGenerator:
                        DevTools (Network > createLink > Request Headers).
         tag: seu identificador de afiliado (ex: "filhomibson20220919203726").
         """
-        self.cookie_header = cookie_header
+        self.cookie_header = cookie_header.strip() if cookie_header else cookie_header
         self.tag = tag
-        self.csrf_token = self._extrair_csrf(cookie_header)
+        self.csrf_token = self._extrair_csrf(self.cookie_header)
 
     def _extrair_csrf(self, cookie_header: str) -> str | None:
         """O header x-csrf-token precisa ser igual ao valor do cookie _csrf

@@ -45,7 +45,7 @@ class AliExpressScraper:
         elevada" (type=2, requireCouponCode=y) em vez de "Melhores
         Produtos" (type=1) — prioriza produtos que rendem mais comissão.
         """
-        self.cookie_header = cookie_header
+        self.cookie_header = cookie_header.strip() if cookie_header else None
         self.comissao_elevada = comissao_elevada
 
     def buscar_ofertas(self, limite: int = 40) -> list[dict]:
