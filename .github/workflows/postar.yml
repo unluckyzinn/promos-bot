@@ -27,6 +27,8 @@ jobs:
           ML_COOKIE_HEADER: ${{ secrets.ML_COOKIE_HEADER }}
           ML_AFFILIATE_TAG: ${{ secrets.ML_AFFILIATE_TAG }}
           AMAZON_ASSOCIATE_TAG: ${{ secrets.AMAZON_ASSOCIATE_TAG }}
+          ALIEXPRESS_COOKIE_HEADER: ${{ secrets.ALIEXPRESS_COOKIE_HEADER }}
           MAX_POSTS_ML: "5"
           MAX_POSTS_AMAZON: "5"
+          MAX_POSTS_ALIEXPRESS: "5"
         run: python main.py
