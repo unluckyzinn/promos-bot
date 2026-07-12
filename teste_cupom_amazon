@@ -1,0 +1,73 @@
+"""
+Teste pontual: busca um lote grande de ofertas da Amazon e posta SÓ as
+que têm cupom nativo, pra confirmar que a extração funciona de verdade.
+
+Não usa a cota normal do main.py, não afeta o fluxo de produção.
+Depois desse teste, o main.py continua funcionando normal (sem mudança).
+
+Rode com: python teste_cupom_amazon.py
+"""
+
+import os
+import sys
+from dotenv import load_dotenv
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+
+from amazon_scraper import AmazonScraper
+from amazon_affiliate import AmazonAffiliateLinkBuilder
+from ofertas_repositorio import OfertasRepositorio
+from telegram_poster import TelegramPoster
+
+load_dotenv()
+
+MAX_POSTS_CUPOM_TESTE = 5
+
+
+def main():
+    telegram = TelegramPoster(
+        bot_token=os.environ["TELEGRAM_BOT_TOKEN"],
+        channel_id=os.environ["TELEGRAM_CHANNEL_ID"],
+    )
+    repositorio = OfertasRepositorio(database_url=os.environ["DATABASE_URL"])
+
+    amazon = AmazonScraper()
+    amazon_tag = os.environ.get("AMAZON_ASSOCIATE_TAG")
+    amazon_afiliado = AmazonAffiliateLinkBuilder(amazon_tag) if amazon_tag else None
+
+    print("Buscando um lote grande de ofertas da Amazon (limite=100)...")
+    ofertas = amazon.buscar_ofertas(limite=100)
+    print(f"Total de ofertas buscadas: {len(ofertas)}")
+
+    com_cupom = [o for o in ofertas if o.get("preco_com_cupom")]
+    print(f"Ofertas COM cupom encontradas: {len(com_cupom)}")
+
+    if not com_cupom:
+        print("Nenhuma oferta com cupom nesse lote. Não há nada pra postar agora.")
+        return
+
+    postadas = 0
+    for oferta in com_cupom:
+        if postadas >= MAX_POSTS_CUPOM_TESTE:
+            break
+
+        item_id = oferta["item_id"]
+
+        if repositorio.ja_foi_postado(item_id):
+            print(f"Já postado antes, pulando: {oferta['titulo']}")
+            continue
+
+        if amazon_afiliado:
+            oferta["link_afiliado"] = amazon_afiliado.gerar_link(oferta["link_afiliado"])
+
+        sucesso = telegram.postar_promocao(oferta)
+        if sucesso:
+            postadas += 1
+            repositorio.marcar_como_postado(item_id, oferta["titulo"])
+            print(f"Postado: {oferta['titulo']} (com cupom: R$ {oferta['preco_com_cupom']})")
+
+    print(f"\nTeste concluído: {postadas} oferta(s) com cupom postada(s).")
+
+
+if __name__ == "__main__":
+    main()

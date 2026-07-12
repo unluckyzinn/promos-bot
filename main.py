@@ -69,7 +69,8 @@ def main():
         )
 
     min_desconto = float(os.environ.get("MIN_DESCONTO_PERCENTUAL", 30))
-    max_posts_por_execucao = int(os.environ.get("MAX_POSTS_POR_EXECUCAO", 10))
+    max_posts_ml = int(os.environ.get("MAX_POSTS_ML", 5))
+    max_posts_amazon = int(os.environ.get("MAX_POSTS_AMAZON", 5))
 
     ofertas_ml = mercado_livre.buscar_ofertas(limite=60)
     for oferta in ofertas_ml:
@@ -92,16 +93,16 @@ def main():
     if not ofertas:
         print("Nenhuma oferta encontrada nesta rodada.")
 
-    postadas = 0
+    postadas_por_fonte = {"mercado_livre": 0, "amazon": 0}
     puladas_por_fonte = {}
 
+    limites = {"mercado_livre": max_posts_ml, "amazon": max_posts_amazon}
+
     for oferta in ofertas:
-        if postadas >= max_posts_por_execucao:
-            print(
-                f"[main] Cota de {max_posts_por_execucao} posts atingida "
-                "nesta rodada. O resto fica pra próxima execução."
-            )
-            break
+        fonte = oferta["fonte"]
+
+        if postadas_por_fonte[fonte] >= limites[fonte]:
+            continue  # essa fonte já bateu a cota dela, mas a outra pode continuar
 
         item_id = oferta.get("item_id")
 
@@ -109,7 +110,6 @@ def main():
             continue
 
         if repositorio.ja_foi_postado(item_id):
-            fonte = oferta["fonte"]
             puladas_por_fonte[fonte] = puladas_por_fonte.get(fonte, 0) + 1
             continue
 
@@ -117,25 +117,31 @@ def main():
             if oferta["desconto_percentual"] < min_desconto:
                 continue
 
-        if oferta["fonte"] == "mercado_livre" and ml_afiliado:
+        if fonte == "mercado_livre" and ml_afiliado:
             link_gerado = ml_afiliado.gerar_link(oferta["link_afiliado"], item_id=item_id)
             if link_gerado:
                 oferta["link_afiliado"] = link_gerado
             else:
                 print(f"[main] Não gerou link de afiliado ML pra: {oferta['titulo']}")
-        elif oferta["fonte"] == "amazon" and amazon_afiliado:
+        elif fonte == "amazon" and amazon_afiliado:
             oferta["link_afiliado"] = amazon_afiliado.gerar_link(oferta["link_afiliado"])
 
         sucesso = telegram.postar_promocao(oferta)
         if sucesso:
-            postadas += 1
+            postadas_por_fonte[fonte] += 1
             repositorio.marcar_como_postado(item_id, oferta["titulo"])
+
+        if all(postadas_por_fonte[f] >= limites[f] for f in limites):
+            print("[main] Cotas das duas fontes atingidas nesta rodada.")
+            break
 
     if puladas_por_fonte:
         resumo = ", ".join(f"{fonte}: {n}" for fonte, n in puladas_por_fonte.items())
         print(f"[main] Ofertas já postadas antes, puladas — {resumo}")
 
-    print(f"Postagem concluída: {postadas} oferta(s) nova(s) postada(s) nesta rodada.")
+    total_postadas = sum(postadas_por_fonte.values())
+    resumo_postadas = ", ".join(f"{fonte}: {n}" for fonte, n in postadas_por_fonte.items())
+    print(f"Postagem concluída: {total_postadas} oferta(s) nova(s) postada(s) — {resumo_postadas}")
 
 
 if __name__ == "__main__":

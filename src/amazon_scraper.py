@@ -1,95 +1,93 @@
 """
-Scraper da página de ofertas da Amazon BR.
+Scraper de ofertas da Amazon BR — usa a API interna de busca de produtos
+(a mesma que o site usa para paginação ao rolar a página de /deals),
+em vez de raspar HTML. Mais simples e mais confiável.
 
-DESCOBERTA IMPORTANTE: a grade de produtos é renderizada via JavaScript
-(a página começa com a classe "a-no-js" e troca pra "a-js" depois que o
-JS roda). Mas os dados de TODOS os produtos já vêm prontos, como um JSON
-embutido dentro de um <script>, numa chamada do tipo:
+Endpoint descoberto via DevTools (Network > XHR) em 01/07/2026:
+    GET /d2b/api/v1/products/search
 
-    assets.mountWidget('slot-14', {"marketplaceId": ..., "symphonyConfig":
-        {"productSearchResponse": {"products": [...]}}})
-
-Ou seja, não precisamos executar JavaScript nem simular navegador — só
-extrair esse JSON direto do HTML. Isso é MAIS confiável que ler classes
-CSS de card, porque não depende de nomes de classe que a Amazon pode
-mudar a qualquer deploy.
-
-Vantagem sobre o Mercado Livre: não precisa de cookie/API pra gerar link
-de afiliado — é só colar "?tag=SEU_ASSOCIATE_TAG" na URL do produto.
+Vantagem sobre o Mercado Livre: não precisa de cookie/sessão pra gerar
+link de afiliado — é só colar "?tag=SEU_ASSOCIATE_TAG" na URL do produto.
 """
 
 import json
 import re
 import requests
 
-URL_OFERTAS = "https://www.amazon.com.br/deals"
+URL_BUSCA = "https://www.amazon.com.br/d2b/api/v1/products/search"
 
-MARCADOR_JSON = "assets.mountWidget('slot-14', "
+FILTROS_PADRAO = {
+    "includedDepartments": [],
+    "excludedDepartments": [],
+    "includedTags": [],
+    "excludedTags": ["EINKBF25"],
+    "promotionTypes": ["LIGHTNING_DEAL", "BEST_DEAL"],
+    "accessTypes": [],
+    "brandIds": [],
+    "unifiedIds": [],
+}
+
+RANKING_CONTEXT_PADRAO = {"pageTypeId": "deals", "rankGroup": "PARENT_ASIN_RANKING"}
 
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     ),
-    "Accept": (
-        "text/html,application/xhtml+xml,application/xml;q=0.9,"
-        "image/avif,image/webp,image/apng,*/*;q=0.8"
-    ),
+    "Accept": "application/json, text/plain, */*",
     "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
     "Accept-Encoding": "gzip, deflate",
     "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
+    "Referer": "https://www.amazon.com.br/deals",
 }
 
 
 class AmazonScraper:
-    def __init__(self, url_ofertas: str = URL_OFERTAS):
-        self.url_ofertas = url_ofertas
+    def __init__(self, url_busca: str = URL_BUSCA):
+        self.url_busca = url_busca
 
     def buscar_ofertas(self, limite: int = 40) -> list[dict]:
-        resp = requests.get(self.url_ofertas, headers=HEADERS, timeout=15)
-
-        if resp.status_code != 200:
-            print(f"[AmazonScraper] Erro HTTP: {resp.status_code}")
-            return []
-
-        produtos_raw = self._extrair_produtos_json(resp.text)
-
-        if produtos_raw is None:
-            print(
-                "[AmazonScraper] Não encontrei o JSON embutido de produtos. "
-                "Provavelmente a Amazon mudou a estrutura da página."
-            )
-            return []
-
         ofertas = []
-        for p in produtos_raw[:limite]:
-            oferta = self._normalizar_produto(p)
-            if oferta:
-                ofertas.append(oferta)
+        start_index = 0
+        page_size = 30
 
-        return ofertas
+        while len(ofertas) < limite:
+            params = {
+                "pageSize": page_size,
+                "startIndex": start_index,
+                "calculateRefinements": "false",
+                "rankingContext": json.dumps(RANKING_CONTEXT_PADRAO),
+                "filters": json.dumps(FILTROS_PADRAO),
+                "pinnedPromotionsLayoutGroup": "default",
+            }
 
-    def _extrair_produtos_json(self, html: str) -> list | None:
-        idx = html.find(MARCADOR_JSON)
-        if idx == -1:
-            return None
+            resp = requests.get(self.url_busca, params=params, headers=HEADERS, timeout=15)
 
-        start = idx + len(MARCADOR_JSON)
-        decoder = json.JSONDecoder()
-        try:
-            # raw_decode acha o fim do objeto JSON automaticamente, sem
-            # precisar saber onde ele termina de antemão.
-            data, _ = decoder.raw_decode(html, start)
-        except json.JSONDecodeError as e:
-            print(f"[AmazonScraper] Erro ao decodificar JSON embutido: {e}")
-            return None
+            if resp.status_code != 200:
+                print(f"[AmazonScraper] Erro HTTP: {resp.status_code}")
+                break
 
-        return data.get("productSearchResponse", {}).get("products", [])
+            try:
+                data = resp.json()
+            except ValueError:
+                print("[AmazonScraper] Resposta não é JSON válido — possível bloqueio.")
+                break
+
+            produtos_raw = data.get("products", [])
+            if not produtos_raw:
+                break  # acabaram as páginas
+
+            for p in produtos_raw:
+                oferta = self._normalizar_produto(p)
+                if oferta:
+                    ofertas.append(oferta)
+
+            next_index = data.get("nextIndex")
+            if not next_index or next_index == start_index:
+                break
+            start_index = next_index
+
+        return ofertas[:limite]
 
     def _normalizar_produto(self, p: dict) -> dict | None:
         try:
@@ -98,7 +96,7 @@ class AmazonScraper:
             link_relativo = p.get("link")
 
             if not asin or not titulo or not link_relativo:
-                return None  # provavelmente um slot de anúncio, não produto
+                return None
 
             link_produto = (
                 f"https://www.amazon.com.br{link_relativo}"
@@ -108,7 +106,7 @@ class AmazonScraper:
 
             preco_info = p.get("price")
             if not preco_info:
-                return None  # sem preço = não é uma oferta postável
+                return None
 
             preco_atual = self._parse_valor(preco_info.get("priceToPay", {}).get("price"))
             preco_original = self._parse_valor(preco_info.get("basisPrice", {}).get("price"))
@@ -120,7 +118,6 @@ class AmazonScraper:
             if preco_original and preco_original > preco_atual:
                 desconto_percentual = ((preco_original - preco_atual) / preco_original) * 100
             else:
-                # fallback: usa o badge textual, ex: "36% off"
                 fragments = (
                     p.get("dealBadge", {}).get("label", {}).get("content", {}).get("fragments", [])
                 )
